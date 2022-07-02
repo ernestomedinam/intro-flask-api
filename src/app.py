@@ -1,81 +1,58 @@
+import os
 from flask import Flask, jsonify, request
 from datetime import datetime
-
+from models import db, Thought
+from flask_migrate import Migrate
 
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URI")
+db.init_app(app)
+Migrate(app, db)
 
-
-class Thought:
-    all_thoughts = []
-
-    def __init__(self, content, tags):
-        self.id = len(self.__class__.all_thoughts) + 1
-        self.content = content
-        self.date = datetime.utcnow
-        self.tags = tags
-        self.__class__.all_thoughts.append(self)
-
-    def serialize(self):
-        return {
-            "id": self.id,
-            "content": self.content,
-            "tags": self.tags
-        }
 
 @app.route("/thoughts", methods=['GET', 'POST'])
 def handle_thoughts():
     if request.method == "GET":
+        all_thoughts = Thought.query.all()
         return jsonify(
-            [thought.serialize() for thought in Thought.all_thoughts]
-        )
+            [thought.serialize() for thought in all_thoughts]
+        ), 200
     else:
         body = request.json
-        new_thought = Thought(
+        new_thought = Thought.record(
             body["content"],
             body["tags"]
         )
+        if new_thought is None:
+            return jsonify("algo salio mal"), 400
         return jsonify(new_thought.serialize()), 201
 
 @app.route("/thoughts/<int:thought_id>", methods=["GET", "PATCH", "DELETE"])
 def handle_thought(thought_id):
-    thoughts = list(
-        filter(
-            lambda thought: thought.id == thought_id,
-            Thought.all_thoughts
-        )
-    )
-    if len(thoughts) == 0: return "no such thought", 404
-    thought = thoughts[0]
+    thought = Thought.query.filter_by(id=thought_id).one_or_none()
+    if thought is None: return "no such thought", 404
     if request.method == "GET":
         return jsonify(thought.serialize()), 200
     elif request.method == "DELETE":
-        Thought.all_thoughts = list(
-            filter(
-                lambda thought: thought.id != thought_id,
-                Thought.all_thoughts
-            )
-        )
+        deleted = thought.delete()
+        if deleted == False: return jsonify("algo salio mal"), 500 
         return "", 204
     else:
         body = request.json
         if 'content' in body:
             # actualizo el objeto
-            thought.content = body["content"]
+            thought.update(body["content"])
+            # thought.content = body["content"]
         if 'tags' in body:
             # actualizco el objeto
-            thought.tags = body["tags"]
+            thought.update_tags(body["tags"])
+            # thought.tags = body["tags"]
         return jsonify(thought.serialize()), 200 # el objeto, serializado
 
 
 @app.route("/hello")
 def hello_api():
     return "hello user"
-
-
-
-
-
-
 
 
 app.run(

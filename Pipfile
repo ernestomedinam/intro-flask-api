@@ -5,6 +5,10 @@ name = "pypi"
 
 [packages]
 flask = "*"
+sqlalchemy = "*"
+flask-sqlalchemy = "*"
+flask-migrate = "*"
+mysql-connector-python = "*"
 
 [dev-packages]
 
@@ -13,3 +17,6 @@ python_version = "3.8"
 
 [scripts]
 start = "python3 src/app.py"
+init = "flask db init"
+migrate = "flask db migrate"
+upgrade = "flask db upgrade"
